@@ -1,0 +1,75 @@
+pipeline{
+	environment{
+		registry = 'tunops/tunway'
+		registryCredential = 'docker'
+		dockerImage = ''
+	}	
+	agent any
+		/*stages{
+			stage('Email Notification'){
+				steps{
+					echo 'Sendind Email'
+					mail bcc: '',
+					body: 'Jenkins build Started',
+					cc: '',
+					from: '',
+					replayTo: '',
+					subject: 'jenkins job',
+					to: 'tunisiantuniops@gmail.com'
+				}
+			}*/
+			stage ('New Build Notifications') {
+				parallel {
+					stage ('Email notification') {
+						steps {
+								echo '>>> Send New application build notification'
+								//mail bcc: '', body: 'Thanks', cc: '', from: '', replyTo: '', subject: "New Build # [$BUILD_NUMBER] triggered for Job [$JOB_NAME]", to: 'tunisiantuniops@gmail.com'
+								mail bcc: '', body: """Dears,
+								A new build has been started for the Job [$JOB_NAME].
+								Below are the Build details:
+								Build Number : $BUILD_NUMBER
+								Build URL is : $BUILD_URL
+								Build Tag : $BUILD_TAG
+								Node Name : $NODE_NAME
+								Executor Number : $EXECUTOR_NUMBER
+								Workspace : $WORKSPACE
+								Thanks. """, cc: '', from: '', replyTo: '', subject: "New Build # [$BUILD_NUMBER] triggered for Job [$JOB_NAME]", to: "$emailRecipientIDs"
+						}
+					}
+					stage ('Slack Notification') {
+						steps {
+							echo '>>> Send New Build Slack notifcation'
+							slackSend baseUrl: 'https://hooks.slack.com/services/', channel: "$slackChannelName", color: 'warning', message: "New Build # [$BUILD_NUMBER] triggered for Job [$JOB_NAME]", teamDomain: "$slackTeamDomainName", tokenCredentialId: 'pipeline-demo-slackID'
+						}
+					}
+				}
+			}
+			stage('Git'){
+				steps{
+					echo 'Cloning'
+					git brach: 'master', url: 'https://github.com/TunOps/TunWay.git/'
+				}
+			}
+			stage('Building our image'){
+				steps{
+					script{
+						dockerImage docker.build registry ":$BUILD_NUMBER"
+					}
+				}
+			}
+			stage('Deploy image to docker Hub'){
+				steps{
+					script{
+						docker.withRegistry('', registryCredential){
+						dockerImage.push}
+					}
+				}
+			}
+			stage('Cleaning up Docker Image'){
+				steps{
+					echo 'Cleaning'
+					sh "docker rmi $registry:$BUILD_NUMBER"
+				}
+			}
+		}
+}	
